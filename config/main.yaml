@@ -1,0 +1,10 @@
+defaults:
+  - train: default
+  - pipe: default
+  - dataset: ship
+
+project: gaussian_enhanced
+name: Hongpei Zheng
+
+ip: 127.0.0.1
+port: 6009

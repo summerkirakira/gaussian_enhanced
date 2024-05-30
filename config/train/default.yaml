@@ -1,0 +1,17 @@
+densify_interval: 100
+densify_from: 500
+densify_grad_threshold: 0.0002
+densify_until_iteration: 15000
+feature_lr: 0.0025
+iterations: 30000
+lambda_dssim: 0.2
+opacity_lr: 0.05
+opacity_reset_interval: 3000
+percent_dense: 0.01
+position_lr_final: 1.6e-06
+position_lr_initial: 0.00016
+position_lr_max_steps: 30000
+random_background: false
+rotation_lr: 0.001
+scaling_lr: 0.005
+position_lr_delay_mult: 0.01
