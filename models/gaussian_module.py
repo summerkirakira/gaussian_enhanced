@@ -72,6 +72,13 @@ class GaussianModule(L.LightningModule):
             if self.global_step < self.config.train.densify_until_iteration:
                 self.densify(self.viewspace_point_tensor, self.visibility_filter, self.radii)
 
+        self.training_report()
+
+
+    def training_report(self):
+        self.log("total_points", self.gaussians.get_xyz.shape[0])
+
+
     def connect_gui(self):
         iteration = self.global_step
         if network_gui.conn == None:

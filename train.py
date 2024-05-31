@@ -21,7 +21,8 @@ def main(cfg):
     cfg.dataset.source_path = str(source_path.absolute())
 
     model = GaussianModule(cfg)
-    dataset = get_dataset(model.scene)
+    train_dataset = get_dataset(model.scene)
+    test_dataset = get_dataset(model.scene, is_train=False)
 
     logger = WandbLogger(
         project=cfg.project,
@@ -33,7 +34,8 @@ def main(cfg):
         logger=logger,
         enable_checkpointing=False
     )
-    trainer.fit(model, dataset)
+    trainer.fit(model, train_dataset)
+    # trainer.test(model, test_dataset)
 
 
 if __name__ == "__main__":
