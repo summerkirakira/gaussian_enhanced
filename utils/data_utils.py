@@ -5,7 +5,7 @@ from scene import Scene
 class GaussianDataset(Dataset):
     def __init__(self, scene: Scene, is_train=True):
         self.is_train = is_train
-        self.cameras = scene.getTrainCameras() if is_train else scene.getTestCameras()
+        self.cameras = scene.getTrainCameras()[:int(len(scene.getTrainCameras()) * 0.8)] if is_train else scene.getTrainCameras()[int(len(scene.getTrainCameras()) * 0.8):]
 
     def __len__(self):
         return len(self.cameras)

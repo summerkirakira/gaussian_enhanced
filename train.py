@@ -32,10 +32,10 @@ def main(cfg):
     trainer = L.Trainer(
         max_steps=cfg.train.iterations,
         logger=logger,
-        enable_checkpointing=False
+        enable_checkpointing=True
     )
     trainer.fit(model, train_dataset)
-    # trainer.test(model, test_dataset)
+    trainer.test(model, test_dataset)
 
 
 if __name__ == "__main__":

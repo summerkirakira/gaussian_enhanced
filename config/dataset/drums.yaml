@@ -1,0 +1,8 @@
+data_device: cuda
+eval: false
+images: images
+resolution: -1
+sh_degree: 3
+source_path: ./data/drums
+white_background: false
+model_path: ./outputs/drums
