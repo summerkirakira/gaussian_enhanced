@@ -47,9 +47,9 @@ class GaussianModule(L.LightningModule):
 
     def save_cache_image(self, image: Tensor, gt_image: Tensor, name="image") -> pathlib.Path:
         concatenated_img = torch.cat([image, gt_image], dim=2)
-        concatenated_img = concatenated_img.cpu().numpy().astype(np.uint8)
+        concatenated_img = concatenated_img.cpu().numpy() * 255
         concatenated_img = np.transpose(concatenated_img, (1, 2, 0))
-        image = Image.fromarray(concatenated_img)
+        image = Image.fromarray(concatenated_img.astype(np.uint8))
         path = self.cache_path / f"{name.split('.')[0]}_{str(uuid.uuid4())}.png"
         image.save(path)
         return path
