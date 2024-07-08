@@ -1,5 +1,5 @@
 from typing import Union, Optional, Callable, Any
-from utils.loss_utils import l1_loss, ssim
+from utils.loss_utils import l1_loss, ssim, lpips_loss
 import lightning as L
 from lightning.pytorch.core.optimizer import LightningOptimizer
 from torch.optim import Optimizer
@@ -12,31 +12,48 @@ import torch
 from torch import Tensor
 from utils.image_utils import psnr, mse
 import wandb
+from PIL import Image
+import pathlib
+from utils.data_utils import TrainResults, add_result
+import numpy as np
+import uuid
 
 
 class GaussianModule(L.LightningModule):
-    def __init__(self, config: BasicConfig):
+    def __init__(self, config: BasicConfig, dataset: BasicConfig.Dataset):
         super().__init__()
         self.config = config
-        self.gaussians = GaussianModel(config.dataset.sh_degree)
-        self.scene = Scene(config.dataset, self.gaussians)
-        self.background = [1, 1, 1] if config.dataset.white_background else [0, 0, 0]
-        self.background = torch.tensor(self.background, dtype=torch.float32, device=config.dataset.data_device)
-
-        network_gui.init(config.ip, config.port)
+        self.gaussians = GaussianModel(dataset.sh_degree)
+        self.scene = Scene(dataset, self.gaussians)
+        self.background = [1, 1, 1] if dataset.white_background else [0, 0, 0]
+        self.background = torch.tensor(self.background, dtype=torch.float32, device=dataset.data_device)
+        self.dataset = dataset
 
         self.viewspace_point_tensor = None
         self.visibility_filter = None
         self.radii = None
 
         self.test_outputs = []
+        self.cache_path = pathlib.Path("cache")
+        if not self.cache_path.exists():
+            self.cache_path.mkdir()
 
-    def log_image(self, image: Tensor, gt_image: Tensor):
+    def log_image(self, image: Tensor, gt_image: Tensor, name: str = "image"):
         concatenated_img = torch.cat([image, gt_image], dim=2)
-        wandb.log({"image": [wandb.Image(concatenated_img)]})
+        wandb.log({name: [wandb.Image(concatenated_img)]})
 
     def on_train_epoch_start(self) -> None:
         self.connect_gui()
+
+    def save_cache_image(self, image: Tensor, gt_image: Tensor, name="image") -> pathlib.Path:
+        concatenated_img = torch.cat([image, gt_image], dim=2)
+        concatenated_img = concatenated_img.cpu().numpy().astype(np.uint8)
+        concatenated_img = np.transpose(concatenated_img, (1, 2, 0))
+        image = Image.fromarray(concatenated_img)
+        path = self.cache_path / f"{name.split('.')[0]}_{str(uuid.uuid4())}.png"
+        image.save(path)
+        return path
+
 
     def test_step(self, batch: Tuple[Camera, str], batch_idx):
         camera = batch[0]
@@ -51,10 +68,15 @@ class GaussianModule(L.LightningModule):
         Lssim = ssim(image, gt_image)
         # self.log("test_ssim_loss", Lssim)
 
-        test_psnr = psnr(image, gt_image)
-        test_mse = mse(image, gt_image)
+        test_psnr = psnr(image, gt_image).mean()
+        test_mse = mse(image, gt_image).mean()
+        test_lpips = lpips_loss(image, gt_image)
 
-        self.test_outputs.append({"test_ll1": Ll1, "test_lssim": Lssim, "test_psnr": test_psnr, "test_mse": test_mse})
+        image_path = self.save_cache_image(image, gt_image, name=camera.image_name)
+        result = TrainResults.Result(name=camera.image_name, ll1=Ll1.item(), lssim=Lssim.item(), psnr=test_psnr.item(), mse=test_mse.item(), lpips=test_lpips.item(), image=str(image_path))
+        add_result(self.dataset.name, result)
+
+        self.test_outputs.append({"test_ll1": Ll1, "test_lssim": Lssim, "test_psnr": test_psnr, "test_mse": test_mse, "test_lpips": test_lpips})
 
     def on_test_epoch_end(self):
         outputs = self.test_outputs
@@ -63,11 +85,13 @@ class GaussianModule(L.LightningModule):
 
         avg_psnr = torch.stack([x['test_psnr'] for x in outputs]).mean()
         avg_mse = torch.stack([x['test_mse'] for x in outputs]).mean()
+        avg_lpips = torch.stack([x['test_lpips'] for x in outputs]).mean()
 
-        self.log("avg_test_ll1", avg_ll1)
-        self.log("avg_test_lssim", avg_lssim)
-        self.log("avg_test_psnr", avg_psnr)
-        self.log("avg_test_mse", avg_mse)
+        self.log(f"{self.dataset.name}_avg_test_ll1", avg_ll1)
+        self.log(f"{self.dataset.name}_avg_test_lssim", avg_lssim)
+        self.log(f"{self.dataset.name}_avg_test_psnr", avg_psnr)
+        self.log(f"{self.dataset.name}_avg_test_mse", avg_mse)
+        self.log(f"{self.dataset.name}_avg_test_lpips", avg_lpips)
 
 
     def training_step(self, batch: Tuple[Camera, str], batch_idx):
@@ -86,14 +110,14 @@ class GaussianModule(L.LightningModule):
         gt_image = camera.original_image.cuda()
 
         Ll1 = l1_loss(image, gt_image)
-        self.log("l1_loss", Ll1)
+        self.log(f"{self.dataset.name}_l1_loss", Ll1)
         Lssim = ssim(image, gt_image)
-        self.log("ssim_loss", Lssim)
+        self.log(f"{self.dataset.name}_ssim_loss", Lssim)
         loss = (1.0 - self.config.train.lambda_dssim) * Ll1 + self.config.train.lambda_dssim * (1.0 - Lssim)
-        self.log("total_loss", loss)
+        self.log(f"{self.dataset.name}_total_loss", loss)
 
-        if self.global_step % 100 == 0:
-            self.log_image(image, gt_image)
+        if self.global_step % 500 == 0:
+            self.log_image(image, gt_image, name=f"Rendered Image[{self.dataset.name}]")
         return loss
 
     def configure_optimizers(self):
@@ -118,7 +142,7 @@ class GaussianModule(L.LightningModule):
         self.training_report()
 
     def training_report(self):
-        self.log("total_points", self.gaussians.get_xyz.shape[0])
+        self.log(f"{self.dataset.name}_total_points", self.gaussians.get_xyz.shape[0])
 
     def connect_gui(self):
         iteration = self.global_step
@@ -133,7 +157,7 @@ class GaussianModule(L.LightningModule):
                         "render"]
                     net_image_bytes = memoryview((torch.clamp(net_image, min=0, max=1.0) * 255).byte().permute(1, 2,
                                                                                                                0).contiguous().cpu().numpy())
-                network_gui.send(net_image_bytes, self.config.dataset.source_path)
+                network_gui.send(net_image_bytes, self.dataset.source_path)
                 if do_training and ((iteration < int(self.config.opt.iterations)) or not keep_alive):
                     break
             except Exception as e:
@@ -151,7 +175,7 @@ class GaussianModule(L.LightningModule):
                                              size_threshold)
 
         if self.global_step % self.config.train.opacity_reset_interval == 0 or (
-                self.config.dataset.white_background and self.global_step == self.config.train.densify_from):
+                self.dataset.white_background and self.global_step == self.config.train.densify_from):
             if self.global_step == 0:
                 return
             self.gaussians.reset_opacity()
@@ -160,4 +184,4 @@ class GaussianModule(L.LightningModule):
         lr = self.gaussians.update_learning_rate(self.global_step)
         if self.global_step % 1000 == 0:
             self.gaussians.oneupSHdegree()
-        self.log("learning_rate", lr)
+        self.log(f"{self.dataset.name}_learning_rate", lr)

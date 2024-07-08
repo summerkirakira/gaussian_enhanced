@@ -13,6 +13,7 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 from math import exp
+import lpips
 
 def l1_loss(network_output, gt):
     return torch.abs((network_output - gt)).mean()
@@ -62,3 +63,7 @@ def _ssim(img1, img2, window, window_size, channel, size_average=True):
     else:
         return ssim_map.mean(1).mean(1).mean(1)
 
+def lpips_loss(img1, img2):
+    loss_fn_alex = lpips.LPIPS(net='alex')
+    loss_fn_alex.cuda()
+    return loss_fn_alex(img1, img2).mean()

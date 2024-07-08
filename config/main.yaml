@@ -1,10 +1,12 @@
 defaults:
   - train: default
   - pipe: default
-  - dataset: ship
+  - dataset:
+      - ship
+      - drums
 
 project: gaussian_enhanced
-name: Version 1
+name: Test[drums]
 
 ip: 127.0.0.1
 port: 6009

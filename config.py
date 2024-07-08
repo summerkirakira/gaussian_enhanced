@@ -28,6 +28,7 @@ class BasicConfig(BaseModel):
         debug: bool
 
     class Dataset(BaseModel):
+        name: str
         data_device: str = 'cuda'
         eval: bool = False
         images: str = 'images'
@@ -40,7 +41,7 @@ class BasicConfig(BaseModel):
     train: TrainCfg
     pipe: Pipe
     project: str
-    dataset: Dataset
+    dataset: list[Dataset]
     name: str
     ip: str
     port: int
