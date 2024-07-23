@@ -9,3 +9,5 @@ name: Baseline[360_Bicycle]
 
 ip: 127.0.0.1
 port: 6009
+
+is_test: true

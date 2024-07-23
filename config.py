@@ -22,6 +22,9 @@ class BasicConfig(BaseModel):
         rotation_lr: float
         scaling_lr: float
 
+        val_check_interval: int
+        checkpoint_interval: int
+
     class Pipe(BaseModel):
         compute_cov3D_python: bool
         convert_SHs_python: bool
@@ -40,6 +43,7 @@ class BasicConfig(BaseModel):
 
     train: TrainCfg
     pipe: Pipe
+    is_test: bool = False
     project: str
     dataset: list[Dataset]
     name: str

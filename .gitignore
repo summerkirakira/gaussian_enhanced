@@ -170,3 +170,4 @@ wandb/
 gaussian_enhanced/
 cache/
 fegs_v2/
+checkpoints/

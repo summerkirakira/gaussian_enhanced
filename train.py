@@ -1,9 +1,11 @@
 import hydra
+
 from config import BasicConfig
 from models.gaussian_module import GaussianModule
-from utils.data_utils import get_dataset
+from utils.data_utils import GaussianDataModule
 from lightning.pytorch.loggers.wandb import WandbLogger
 import lightning as L
+from lightning.pytorch.callbacks import ModelCheckpoint
 from pathlib import Path
 from datetime import datetime
 from utils.data_utils import upload_results
@@ -33,7 +35,19 @@ def main(cfg):
 
     network_gui.init(cfg.ip, cfg.port)
 
+
+
     for dataset in cfg.dataset:
+
+        checkpoint_callback = ModelCheckpoint(
+            monitor=f'{dataset.name}_total_loss',
+            dirpath='./checkpoints',
+            filename=f'{dataset.name}/'+'{epoch:02d}-{' + f'{dataset.name}_total_loss' + ':.4f}',
+            save_top_k=1,
+            every_n_train_steps=cfg.train.checkpoint_interval,
+            mode='min'
+        )
+
         model_path = Path(dataset.model_path)
         if not model_path.exists():
             model_path.parent.mkdir(parents=True, exist_ok=True)
@@ -43,17 +57,30 @@ def main(cfg):
             raise FileNotFoundError(f"Source path {source_path} does not exist.")
         dataset.source_path = str(source_path.absolute())
 
-        model = GaussianModule(cfg, dataset)
-        train_dataset = get_dataset(model.scene)
-        test_dataset = get_dataset(model.scene, is_train=False)
+        if not cfg.is_test:
+            model = GaussianModule(cfg, dataset)
+        else:
+            model_path = Path('checkpoints') / f'{dataset.name}'
+            if not model_path.exists():
+                raise FileNotFoundError(f"Model path {model_path} does not exist.")
+            checkpoint_path = str(next(model_path.glob('*.ckpt')))
+            model = GaussianModule.load_from_checkpoint(
+                checkpoint_path,
+                config=cfg,
+                dataset=dataset
+            )
+        datamodule = GaussianDataModule(model.scene)
 
         trainer = L.Trainer(
             max_steps=cfg.train.iterations,
             logger=logger,
-            enable_checkpointing=False
+            val_check_interval=cfg.train.val_check_interval,
+            callbacks=[checkpoint_callback],
         )
-        trainer.fit(model, train_dataset)
-        trainer.test(model, test_dataset)
+        if not cfg.is_test:
+            trainer.fit(model, datamodule=datamodule)
+        model.eval()
+        trainer.test(model, datamodule=datamodule)
 
     upload_results(logger)
 

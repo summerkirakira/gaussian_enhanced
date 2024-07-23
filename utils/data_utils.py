@@ -2,9 +2,11 @@ from torch.utils.data import Dataset
 from scene import Scene
 from pydantic import BaseModel
 from lightning.pytorch.loggers.wandb import WandbLogger
+from lightning.pytorch import LightningDataModule
 import wandb
 from PIL import Image
 import random
+from typing import Optional
 
 
 class TrainResults(BaseModel):
@@ -23,15 +25,36 @@ class TrainResults(BaseModel):
 _results = TrainResults(data={})
 
 
+class GaussianDataModule(LightningDataModule):
+    def __init__(self, scene: Scene):
+        super().__init__()
+        self.scene = scene
+
+    def setup(self, stage: Optional[str] = None):
+        pass
+
+    def train_dataloader(self):
+        cameras = self.scene.getTrainCameras()
+        return GaussianDataset(cameras)
+
+    def val_dataloader(self):
+        if len(self.scene.test_cameras) > 5:
+            cameras = random.sample(self.scene.getTrainCameras(), 5)
+        else:
+            cameras = random.sample(self.scene.getTrainCameras(), 5)
+        return GaussianDataset(cameras)
+
+    def test_dataloader(self):
+        if len(self.scene.test_cameras) != 0:
+            cameras = self.scene.test_cameras
+        else:
+            cameras = self.scene.getTrainCameras()
+        return GaussianDataset(cameras)
+
+
 class GaussianDataset(Dataset):
-    def __init__(self, scene: Scene, is_train=True):
-        self.is_train = is_train
-        self.cameras = scene.getTrainCameras()
-
-        if not is_train:
-            self.cameras = random.sample(self.cameras, 10)
-
-        # self.cameras = scene.getTrainCameras()[:int(len(scene.getTrainCameras()) * 0.8)] if is_train else scene.getTrainCameras()[int(len(scene.getTrainCameras()) * 0.8):]
+    def __init__(self, cameras: list):
+        self.cameras = cameras
 
     def __len__(self):
         return len(self.cameras)

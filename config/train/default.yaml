@@ -15,3 +15,6 @@ random_background: false
 rotation_lr: 0.001
 scaling_lr: 0.005
 position_lr_delay_mult: 0.01
+
+val_check_interval: 1000
+checkpoint_interval: 1000

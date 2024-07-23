@@ -1,4 +1,4 @@
-from typing import Union, Optional, Callable, Any
+from typing import Union, Optional, Callable, Any, Dict
 from utils.loss_utils import l1_loss, ssim, lpips_loss
 import lightning as L
 from lightning.pytorch.core.optimizer import LightningOptimizer
@@ -57,6 +57,20 @@ class GaussianModule(L.LightningModule):
         image.save(path)
         return path
 
+    def validation_step(self, batch, batch_idx):
+        camera = batch[0]
+        bg = torch.rand((3), device="cuda") if self.config.train.random_background else self.background
+        render_pkg = render(camera, self.gaussians, self.config.pipe, bg)
+        image = render_pkg["render"]
+        gt_image = camera.original_image.cuda()
+
+        image = torch.clamp(image, min=0, max=1.0)
+        gt_image = torch.clamp(gt_image, min=0, max=1.0)
+
+        test_psnr = psnr(image, gt_image).mean().double()
+
+        self.log(f"{self.dataset.name}_val_psnr", test_psnr)
+
     def test_step(self, batch: Tuple[Camera, str], batch_idx):
         camera = batch[0]
         bg = torch.rand((3), device="cuda") if self.config.train.random_background else self.background
@@ -68,17 +82,17 @@ class GaussianModule(L.LightningModule):
         image = torch.clamp(image, min=0, max=1.0)
         gt_image = torch.clamp(gt_image, min=0, max=1.0)
 
-        Ll1 = l1_loss(image, gt_image)
+        Ll1 = l1_loss(image, gt_image).mean().double()
         # self.log("test_l1_loss", Ll1)
-        Lssim = ssim(image, gt_image)
+        Lssim = ssim(image, gt_image).mean().double()
         # self.log("test_ssim_loss", Lssim)
 
-        test_psnr = psnr(image, gt_image).mean()
-        test_mse = mse(image, gt_image).mean()
+        test_psnr = psnr(image, gt_image).mean().double()
+        test_mse = mse(image, gt_image).mean().double()
         test_lpips = lpips_loss(image, gt_image)
 
         image_path = self.save_cache_image(image, gt_image, name=camera.image_name)
-        result = TrainResults.Result(name=camera.image_name, ll1=Ll1.item(), lssim=Lssim.item(), psnr=test_psnr.item(), mse=test_mse.item(), lpips=test_lpips.item(), image=str(image_path))
+        result = TrainResults.Result(name=camera.image_name, ll1=Ll1, lssim=Lssim.item(), psnr=test_psnr, mse=test_mse, lpips=test_lpips, image=str(image_path))
         add_result(self.dataset.name, result)
 
         self.log_image(image, gt_image, name=f"{self.dataset.name} Test Render Image")
@@ -192,3 +206,9 @@ class GaussianModule(L.LightningModule):
         if self.global_step % 1000 == 0:
             self.gaussians.oneupSHdegree()
         self.log(f"{self.dataset.name}_learning_rate", lr)
+
+    def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
+        checkpoint['model_params'] = self.gaussians.capture()
+
+    def on_load_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
+        self.gaussians.restore(checkpoint['model_params'], self.config.train)
