@@ -50,7 +50,7 @@ def main(cfg):
         trainer = L.Trainer(
             max_steps=cfg.train.iterations,
             logger=logger,
-            enable_checkpointing=True
+            enable_checkpointing=False
         )
         trainer.fit(model, train_dataset)
         trainer.test(model, test_dataset)

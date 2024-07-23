@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from lightning.pytorch.loggers.wandb import WandbLogger
 import wandb
 from PIL import Image
+import random
 
 
 class TrainResults(BaseModel):
@@ -25,7 +26,12 @@ _results = TrainResults(data={})
 class GaussianDataset(Dataset):
     def __init__(self, scene: Scene, is_train=True):
         self.is_train = is_train
-        self.cameras = scene.getTrainCameras()[:int(len(scene.getTrainCameras()) * 0.8)] if is_train else scene.getTrainCameras()[int(len(scene.getTrainCameras()) * 0.8):]
+        self.cameras = scene.getTrainCameras()
+
+        if not is_train:
+            self.cameras = random.sample(self.cameras, 10)
+
+        # self.cameras = scene.getTrainCameras()[:int(len(scene.getTrainCameras()) * 0.8)] if is_train else scene.getTrainCameras()[int(len(scene.getTrainCameras()) * 0.8):]
 
     def __len__(self):
         return len(self.cameras)

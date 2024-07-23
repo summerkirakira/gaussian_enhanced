@@ -2,11 +2,10 @@ defaults:
   - train: default
   - pipe: default
   - dataset:
-      - ship
-      - drums
+      - 360_bicycle
 
-project: gaussian_enhanced
-name: Test[drums]
+project: fegs_v2_test
+name: Baseline[360_Bicycle]
 
 ip: 127.0.0.1
 port: 6009

@@ -1,0 +1,9 @@
+360_bicycle:
+  data_device: cuda
+  eval: false
+  images: images
+  resolution: -1
+  sh_degree: 3
+  source_path: ./data/360_bicycle
+  white_background: false
+  model_path: ./outputs/360_bicycle
