@@ -2,12 +2,12 @@ defaults:
   - train: default
   - pipe: default
   - dataset:
-      - 360_bicycle
+      - tank_train
 
-project: fegs_v2_test
-name: Baseline[360_Bicycle]
+project: 3d_gs_baseline
+name: Tank_Train
 
 ip: 127.0.0.1
 port: 6009
 
-is_test: true
+is_test: false

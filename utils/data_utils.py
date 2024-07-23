@@ -1,4 +1,4 @@
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from scene import Scene
 from pydantic import BaseModel
 from lightning.pytorch.loggers.wandb import WandbLogger
@@ -35,6 +35,7 @@ class GaussianDataModule(LightningDataModule):
 
     def train_dataloader(self):
         cameras = self.scene.getTrainCameras()
+
         return GaussianDataset(cameras)
 
     def val_dataloader(self):
@@ -45,8 +46,8 @@ class GaussianDataModule(LightningDataModule):
         return GaussianDataset(cameras)
 
     def test_dataloader(self):
-        if len(self.scene.test_cameras) != 0:
-            cameras = self.scene.test_cameras
+        if len(self.scene.getTestCameras()) != 0:
+            cameras = self.scene.getTestCameras()
         else:
             cameras = self.scene.getTrainCameras()
         return GaussianDataset(cameras)
@@ -54,6 +55,7 @@ class GaussianDataModule(LightningDataModule):
 
 class GaussianDataset(Dataset):
     def __init__(self, cameras: list):
+        super().__init__()
         self.cameras = cameras
 
     def __len__(self):
@@ -61,10 +63,6 @@ class GaussianDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.cameras[idx], 'dummy_target'
-
-
-def get_dataset(scene: Scene, is_train=True):
-    return GaussianDataset(scene, is_train)
 
 
 def add_result(dataset, result: TrainResults.Result):

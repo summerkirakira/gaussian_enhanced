@@ -74,13 +74,13 @@ def main(cfg):
         trainer = L.Trainer(
             max_steps=cfg.train.iterations,
             logger=logger,
-            val_check_interval=cfg.train.val_check_interval,
             callbacks=[checkpoint_callback],
         )
+        datamodule.test_dataloader()
         if not cfg.is_test:
-            trainer.fit(model, datamodule=datamodule)
+            trainer.fit(model, datamodule.train_dataloader())
         model.eval()
-        trainer.test(model, datamodule=datamodule)
+        trainer.test(model, datamodule.test_dataloader())
 
     upload_results(logger)
 
